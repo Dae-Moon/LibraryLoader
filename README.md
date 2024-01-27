@@ -8,7 +8,7 @@ A **LibraryLoader** for Counter-Strike 1.6 using Visual Studio 2017 and written 
 Use it at your own risk.
 # Requirement
 Tested on build 4554, 8684.\
-Testet on Windows 10.\
+Tested on Windows 10.\
 Linux support will be available later.
 # Commands
 load_library 'Path\To\Dll' - Loads the module into the address space of the process.\
