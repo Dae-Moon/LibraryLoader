@@ -1,6 +1,7 @@
 typedef struct module_t
 {
 	HMODULE handle;
+	char file_name[MAX_PATH];
 	void* base;
 	unsigned size;
 	void* end;
@@ -33,6 +34,7 @@ pmodule_t _get_module_information(LPCSTR lpModuleName)
 	auto pMI = new module_t;
 
 	pMI->handle = hModule;
+	GetModuleFileName(hModule, pMI->file_name, MAX_PATH);
 	pMI->base = MBI.AllocationBase;
 	pMI->size = pIND->OptionalHeader.SizeOfImage;
 	pMI->end = (void*)((unsigned)pMI->base + pMI->size - 1);
