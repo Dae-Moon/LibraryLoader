@@ -2,7 +2,7 @@
 A **LibraryLoader** for Counter-Strike 1.6 using Visual Studio 2017 and written C++.
 # Usage
 1. Download from [Releases](https://github.com/Dae-Moon/LibraryLoader/releases) or compile using MSVC compiler.
-2. Inject dll into **hl.exe** process or rename to .asi and move it to the folder of the game.
+2. Inject dll into **hl.exe** process or rename to **.asi** and move it to the folder of the game.
 3. Use [commands](https://github.com/Dae-Moon/LibraryLoader?tab=readme-ov-file#commands) in console.
 # VAC (Valve-Anti-Cheat)
 Use it at your own risk.
