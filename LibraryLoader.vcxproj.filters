@@ -2,10 +2,19 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="utils\peb.cpp" />
+    <ClCompile Include="game\build_number.cpp" />
+    <ClCompile Include="game\console.cpp" />
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="utils\memory.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="headers.h" />
-    <ClInclude Include="sdk.h" />
-    <ClInclude Include="memory.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="game\sdk.h" />
+    <ClInclude Include="utils\memory.h" />
+    <ClInclude Include="game\console.h" />
+    <ClInclude Include="game\build_number.h" />
+    <ClInclude Include="utils\peb.h" />
+    <ClInclude Include="dllmain.h" />
   </ItemGroup>
 </Project>

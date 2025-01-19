@@ -1,11 +1,4 @@
-typedef struct module_t
-{
-	HMODULE handle;
-	char file_name[MAX_PATH];
-	void* base;
-	unsigned size;
-	void* end;
-} *pmodule_t;
+#include "pch.h"
 
 pmodule_t _get_module_information(LPCSTR lpModuleName)
 {
@@ -36,7 +29,7 @@ pmodule_t _get_module_information(LPCSTR lpModuleName)
 	pMI->handle = hModule;
 	GetModuleFileName(hModule, pMI->file_name, MAX_PATH);
 	pMI->base = MBI.AllocationBase;
-	pMI->size = pIND->OptionalHeader.SizeOfImage;
+	pMI->size = (unsigned)pIND->OptionalHeader.SizeOfImage;
 	pMI->end = (void*)((unsigned)pMI->base + pMI->size - 1);
 
 	return pMI;
@@ -54,10 +47,12 @@ bool _far_pointer(void* ptr, void* start, void* end)
 	return !(ptr > start && ptr < end);
 }
 
-void* _aob_scan(void* sig, void* start, void* end)
+void* _aob_scan(void* sig, void* start, void* end, size_t size)
 {
 	//const auto size = sizeof(sig) / sizeof(*(void**)sig);
-	const auto size = strlen((char*)sig);
+
+	if (!size)
+		size = strlen((char*)sig);
 
 	if (!size)
 		return 0;

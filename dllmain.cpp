@@ -1,17 +1,17 @@
-#include "headers.h"
+#include "pch.h"
 
 std::map<std::string, HMODULE> loaded_modules;
 
+pmodule_t hw, gameui;
+HMODULE handle;
+cl_enginefuncs_s* pEngFuncs;
+int iBuildNum = 0;
+
 #pragma region Offsets
 
-static pmodule_t hw, gameui;
-static HMODULE handle;
-static cl_enginefuncs_s* pEngFuncs;
-static PColor24 Console_TextColor;
-
-void* Engine()
+static void* Engine()
 {
-	void* sig = (void*)"\x68\xFF\xFF\xFF\xFF\xFF\x15\xFF\xFF\xFF\xFF\x68\xFF\xFF\xFF\xFF\xE8\xFF\xFF\xFF\xFF\x83\xC4\x1C";
+	void* sig = iBuildNum <= 4554 ? (void*)"\x68\xFF\xFF\xFF\xFF\xFF\x15\xFF\xFF\xFF\xFF\x68\xFF\xFF\xFF\xFF\xE8\xFF\xFF\xFF\xFF\x83\xC4\x1C" : (void*)"\x68\xFF\xFF\xFF\xFF\xFF\x15\xFF\xFF\xFF\xFF\x68\xFF\xFF\xFF\xFF\xE8\xFF\xFF\xFF\xFF\x83\xC4\x1C";
 	void* ptr = _aob_scan(sig, hw->base, hw->end);
 
 	if (_far_pointer(ptr, hw->base, hw->end))
@@ -20,7 +20,7 @@ void* Engine()
 	return *(void**)((unsigned)ptr + 0x1);
 }
 
-void* GameConsole()
+static void* GameConsole()
 {
 	void* PatternAddress = _aob_scan((void*)"GameConsole003", gameui->base, gameui->end);
 	void* ReferenAddress = _find_reference(PatternAddress, gameui->base, gameui->end);
@@ -31,46 +31,71 @@ void* GameConsole()
 	return *(void**)((unsigned)ReferenAddress + 0x21);
 }
 
-void ConsoleColorInitialize()
+static void* LECT()
 {
-	auto gameConsole = (unsigned)GameConsole();
+	void* sig = (void*)"Jan\0Feb\0Mar\0Apr\0May\0Jun\0Jul\0Aug\0Sep\0Oct\0Nov\0Dec";
+	void* ptr = _aob_scan(sig, hw->base, hw->end, 48);
 
-	if (gameConsole)
+	if (_far_pointer(ptr, hw->base, hw->end))
+		return 0;
+
+	uintptr_t* exe_build_string_end_ptr = (uintptr_t*)((uint8_t*)ptr - 1);
+	uintptr_t* exe_build_string_start_ptr = nullptr;
+
+	static const char* mon[12] =
+	{ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+	// walk down the binary until we come across any of the months.
+	char* date_string_final = nullptr;
+	for (int i = 0; i < 11; i++)
 	{
-		DWORD Panel = (*(PDWORD)(gameConsole + 8) - gameConsole);
+		char* b = (char*)exe_build_string_end_ptr;
 
-		Console_TextColor = PColor24(Panel + gameConsole + 288 + sizeof(DWORD));
-
-		if (*(PDWORD)(DWORD(Console_TextColor) + 8) != 0)
+		bool found = false;
+		int k = 0;
+		while (true)
 		{
-			Console_TextColor = PColor24(Panel + gameConsole + 288 + (sizeof(DWORD) * 2));
+			if (k > 20)
+			{
+				break;
+			}
+
+			if (!_strnicmp(b, mon[i], 3))
+			{
+				found = true;
+				break;
+			}
+
+			k++;
+			b--;
+		}
+
+		if (found)
+		{
+			date_string_final = b;
+			break;
 		}
 	}
+
+	if (!date_string_final || !date_string_final[0])
+	{
+		// "Fatal error while parsing the timestamp string!"
+		// "Couldn't get engine compile date string!"
+		return 0;
+	}
+
+	return (void*)date_string_final;
 }
 
 #pragma endregion
 
 #pragma region Main
 
-void ConsolePrintColor(byte R, byte G, byte B, const char *fmt, ...)
-{
-	va_list va_alist;
-	char buf[256];
-	va_start(va_alist, fmt);
-	_vsnprintf(buf, sizeof(buf), fmt, va_alist);
-	va_end(va_alist);
-	TColor24 DefaultColor;
-	PColor24 Ptr = Console_TextColor;
-	DefaultColor = *Ptr; Ptr->R = R; Ptr->G = G; Ptr->B = B;
-	pEngFuncs->Con_Printf(buf);
-	*Ptr = DefaultColor;
-}
-
 static void LoadLibraryFunc(void)
 {
 	if (pEngFuncs->Cmd_Argc() < 2)
 	{
-		ConsolePrintColor(-1, 255, 0, 0, "ERROR: the path is not specified.\n");
+		Console_PrintError("ERROR: the path is not specified.\n");
 		return;
 	}
 
@@ -85,7 +110,7 @@ static void UnloadLibraryFunc(void)
 {
 	if (pEngFuncs->Cmd_Argc() < 2)
 	{
-		ConsolePrintColor(-1, 255, 0, 0, "ERROR: the path is not specified.\n");
+		Console_PrintError("ERROR: the path is not specified.\n");
 		return;
 	}
 
@@ -123,7 +148,7 @@ static void LogModules(void)
 						if (pair.first.find(ModuleEntry32.szModule) != std::string::npos)
 							color.R = color.G = color.B = 255;
 					}
-					ConsolePrintColor(color.R, color.G, color.B, "%s\n", ModuleEntry32.szModule);
+					Console_PrintColor(color.R, color.G, color.B, "%s\n", ModuleEntry32.szModule);
 
 				} while (Module32Next(hSnapshot, &ModuleEntry32));
 			}
@@ -137,46 +162,53 @@ static void LogModules(void)
 
 	if (!pModule)
 	{
-		ConsolePrintColor(255, 0, 0, "ERROR: module not found.\n");
+		Console_PrintError("ERROR: module not found.\n");
 		return;
 	}
 
-	ConsolePrintColor(color.R, color.G, color.B, "Path: ");
-	ConsolePrintColor(0, 0, 255, "%s\n", pModule->file_name);
+	Console_PrintColor(color.R, color.G, color.B, "Path: ");
+	Console_PrintColor(0, 0, 255, "%s\n", pModule->file_name);
 
-	ConsolePrintColor(color.R, color.G, color.B, "Allocation base: ");
-	ConsolePrintColor(0, 255, 0, "%p\n", pModule->base);
+	Console_PrintColor(color.R, color.G, color.B, "Allocation base: ");
+	Console_PrintColor(0, 255, 0, "%p\n", pModule->base);
 
-	ConsolePrintColor(color.R, color.G, color.B, "Size of image: ");
-	ConsolePrintColor(255, 255, 255, "%u\n", pModule->size);
+	Console_PrintColor(color.R, color.G, color.B, "Size of image: ");
+	Console_PrintColor(255, 255, 255, "%u\n", pModule->size);
 }
 
-
-static void Init()
+static bool Init()
 {
-	hw = _get_module_information("hw.dll");
+	//if (!HideDll((HINSTANCE)handle))
+	//	return false;
 
-	if (!hw)
-		return;
+	if (!(hw = _get_module_information("hw.dll")))
+		return false;
 
-	gameui = _get_module_information("gameui.dll");
+	if (!(gameui = _get_module_information("gameui.dll")))
+		return false;
 
-	if (!gameui)
-		return;
+	auto date = (const char*)LECT();
 
-	pEngFuncs = (cl_enginefuncs_s*)Engine();
+	if (!date || !date[0])
+		return false;
 
-	if (!pEngFuncs)
-		return;
+	if (!(iBuildNum = build_number(date)))
+		return false;
 
-	ConsoleColorInitialize();
+	if (!(pEngFuncs = (cl_enginefuncs_s*)Engine()))
+		return false;
+
+	if (!Console_InitializeColor(GameConsole()))
+		return false;
 
 	if (!Console_TextColor)
-		return;
+		return false;
 
 	pEngFuncs->pfnAddCommand("load_library", LoadLibraryFunc);
 	pEngFuncs->pfnAddCommand("unload_library", UnloadLibraryFunc);
 	pEngFuncs->pfnAddCommand("log_modules", LogModules);
+
+	return true;
 }
 
 BOOL WINAPI DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
@@ -185,9 +217,12 @@ BOOL WINAPI DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
 	{
 		if (GetLastError() == ERROR_ALREADY_EXISTS)
 			return TRUE;
+
 		handle = hModule;
 		DisableThreadLibraryCalls(hModule);
-		Init();
+		
+		if (!Init())
+			return FALSE;
 	}
 
 	return TRUE;
